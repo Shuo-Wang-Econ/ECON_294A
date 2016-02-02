@@ -44,8 +44,8 @@ NHIS$weight2 <- ifelse(NHIS$weight >= 996,
 
 ShuoWangAssignment2$s2f <- mean(NHIS$weight2,na.rm=TRUE)
 ShuoWangAssignment2$s2g <- median(NHIS$weight2,na.rm=TRUE)
-ShuoWangAssignment2$s2h <- summary(NHIS[NHIS$SEX==2,]$weight2)
-ShuoWangAssignment2$s2i <- summary(NHIS[NHIS$SEX==1,]$weight2)
+ShuoWangAssignment2$s2h <- summary(subset(NHIS,SEX==2)$weight2)
+ShuoWangAssignment2$s2i <- summary(subset(NHIS,SEX==1)$weight2)
 
 # Question 3
 vec <- c(letters,LETTERS)
@@ -63,7 +63,19 @@ library(foreign)
 org_example.dta<-read.dta("/Users/shuowang/Downloads/Econ 217/Homework1/org_example.dta")
 View(org_example.dta)
 org<-org_example.dta
-ShuoWangAssignment2$s4-aggregate(org$rw, na.rm=TRUE,list(year = org$year, month=org$month, educ=org$educ), mean)
+system.time({
+  df.2 <- aggregate(
+    org$rw,
+    by = list(
+      year = org$year,
+      month = org$month,
+      educ = org$educ
+    ),
+    FUN = mean, na.rm = T
+  )
+  names(df.2)[4] <- "rw_mean"
+})
+ShuoWangAssignment2$s4<-df.2
 
 save(ShuoWangAssignment2,
      file = "/Users/shuowang/Documents/ECON_294A－RRR/ECON_294A/ShuoWangAssignment2.RData")
