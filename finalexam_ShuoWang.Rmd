@@ -1,0 +1,147 @@
+---
+title: "Final_Exam"
+author: "Shuo Wang"
+date: "March 17, 2016"
+output: html_document
+---
+
+##### At first, there are some preparations
+```{r}
+library(nycflights13)
+library(RSQLite)
+library(dplyr)
+library(ggplot2)
+
+my_db <- src_sqlite("my_db.sqlite3", create = T)
+
+nycflights13_sqlite()
+my_db
+flights_sqlite <- tbl(my_db, "flights")
+
+flights <- tbl(my_db, "flights") %>% 
+  collect() %>%
+  mutate(canceled = is.na(arr_time))
+
+weather<-data.frame(tbl(my_db, "weather"))
+```
+
+Add time in a uniform format,just like "2013_1_1_5_EWR", then we can join the "flights" and "weather" by "time"
+```{r}
+flights$time<- paste(flights$year, flights$month,flights$day, flights$hour,flights$origin, sep="_")
+weather$time<- paste(weather$year,weather$month, weather$day, weather$hour,weather$origin, sep = "_")
+
+flights_and_weather<-dplyr::left_join(flights, weather, by = "time")
+
+flights_and_weather$year = flights_and_weather$year.x
+flights_and_weather$month = flights_and_weather$month.x
+flights_and_weather$day = flights_and_weather$day.x
+```
+
+Delete redundent features
+```{r}
+flights_and_weather$year.x = NULL
+flights_and_weather$year.y = NULL
+flights_and_weather$month.x = NULL
+flights_and_weather$month.y = NULL
+flights_and_weather$day.x = NULL
+flights_and_weather$day.y = NULL
+flights_and_weather$time= NULL
+flights_and_weather$hour = flights_and_weather$hour.x
+flights_and_weather$hour.x = NULL
+flights_and_weather$hour.y = NULL
+```
+
+## For a)weather on cancelled flights
+Compute the coefficients between weather features and cancellation to determine which feature is more important to cancellation
+```{r}
+cor(flights_and_weather[,15:23],flights_and_weather$dep_delay, use = "complete")
+```
+
+## For b)hour, day and month on cancelled flights
+Use graph to see the relationship between time and cancellation
+```{r}
+aggr_flights_weather <- aggregate(flights_and_weather["dep_delay"],flights_and_weather["hour"],sum, na.rm = TRUE)
+ggplot(aggr_flights_weather,aes(hour,dep_delay))+geom_point()
+
+aggr_flights_weather_day <- aggregate(flights_and_weather["dep_delay"],flights_and_weather["day"],sum, na.rm = TRUE)
+ggplot(aggr_flights_weather_day,aes(day,dep_delay))+geom_point()
+
+aggr_flights_weather_month <- aggregate(flights_and_weather["dep_delay"],flights_and_weather["month"],sum, na.rm = TRUE)
+ggplot(aggr_flights_weather_month,aes(month,dep_delay))+geom_point()
+```
+
+## For c)airport destination on cancelled flights
+```{r}
+aggr_flights_weather_dest <- aggregate(flights_and_weather["dep_delay"],flights_and_weather["dest"],sum, na.rm = TRUE)
+aggr_flights_weather_dest_order<-aggr_flights_weather_dest[order(-aggr_flights_weather_dest$dep_delay),]
+head(aggr_flights_weather_dest_order)
+summary(aggr_flights_weather_dest_order)
+
+count_cancel_dest<-aggregate(flights_and_weather["canceled"],flights_and_weather["dest"],sum, na.rm = TRUE)
+count_cancel_dest_order<-count_cancel_dest[order(-count_cancel_dest$canceled),]
+head(count_cancel_dest_order)
+summary(count_cancel_dest_order)
+```
+
+## For d)characteristics of the plane on cancelled flights
+First, join the "flights" and "planes" by "tailnum", which is unique 
+```{r}
+flights_planes<-dplyr::left_join(flights, planes, by = "tailnum")
+```
+
+```{r}
+flights_planes_manufacture_year<-aggregate(flights_planes["canceled"],flights_planes["year.y"],sum, na.rm = TRUE)
+flights_planes_manufacture_year_order<-flights_planes_manufacture_year[order(-flights_planes_manufacture_year$canceled),]
+head(flights_planes_manufacture_year_order)
+summary(flights_planes_manufacture_year_order)
+
+flights_planes_type<-aggregate(flights_planes["canceled"],flights_planes["type"],sum, na.rm = TRUE)
+flights_planes_type_order<-flights_planes_type[order(-flights_planes_type$canceled),]
+head(flights_planes_type_order)
+summary(flights_planes_type_order)
+
+flights_planes_manufacturer<-aggregate(flights_planes["canceled"],flights_planes["manufacturer"],sum, na.rm = TRUE)
+flights_planes_manufacturer_order<-flights_planes_manufacturer[order(-flights_planes_manufacturer$canceled),]
+head(flights_planes_manufacturer_order)
+summary(flights_planes_manufacturer_order)
+
+flights_planes_model<-aggregate(flights_planes["canceled"],flights_planes["model"],sum, na.rm = TRUE)
+flights_planes_model_order<-flights_planes_model[order(-flights_planes_model$canceled),]
+head(flights_planes_model_order)
+summary(flights_planes_model_order)
+
+flights_planes_seats<-aggregate(flights_planes["canceled"],flights_planes["seats"],sum, na.rm = TRUE)
+flights_planes_seats_order<-flights_planes_seats[order(-flights_planes_seats$canceled),]
+head(flights_planes_seats_order)
+summary(flights_planes_seats_order)
+
+flights_planes_engine<-aggregate(flights_planes["canceled"],flights_planes["engine"],sum, na.rm = TRUE)
+flights_planes_engine_order<-flights_planes_engine[order(-flights_planes_engine$canceled),]
+head(flights_planes_engine_order)
+summary(flights_planes_engine_order)
+```
+
+## Conclusion
+#### For a)weather on cancelled flights:
+From the correlation between weather features and departure delay time, we can see that temperature and departure delay time have the biggest correlation, which means that the change in temperature has the most influential effect on departure delay time. The more departure delay time, the more likely the flight is cancelled.
+
+#### For b)hour, day and month on cancelled flights:
+From the graph, in a day, in the time period 8pm-9pm has the biggest total departure delay time compared with other time period.
+From the graph, in a month, around 7th and 21th in a month has the biggest total departure delay time compared with other days in a month.
+From the graph, in a year, around June and July in a year has the biggest total departure delay time compared with other months in a year.
+
+#### For c)airport destination on cancelled flights:
+“ORD”,”ATL”,”SFO”,”MCO” and “FLL” have much more departure delay time than average.
+“ORD”,”DCA”,”BOS”,”CLF” and “RDU” have more cancelled flights than average.
+
+#### For d)characteristics of the plane on cancelled flights:
+Planes that are made in 2002 have been cancelled most.
+Planes that are “Fixed wing multi engine” have been cancelled most.
+Planes that are made by “EMBRAER” have been cancelled most.
+Planes that have the model “EMB-145LR” have been cancelled most.
+Planes that have the 55 seats have been cancelled most.
+Planes that have the engine “Turbo-fan” have been cancelled most.
+
+#### In conclusion, at New York City airports in 2013, if the temperature is too low or too high, or if it is 8pm-9pm, or if it is around 7th and 21th in a month, or if it is around June and July, or if the plane is made in 2002, or if the plane is “Fixed wing multi engine”, or if the plane is made by “EMBRAER”, or if the model of the plane is “EMB-145LR”, or if the plane has 55 seats, or if the engine is “Turbo-fan”, it is highly likely that the takeoff delays and cancellation will happen.
+
+
